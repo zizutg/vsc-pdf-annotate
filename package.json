@@ -58,6 +58,11 @@
           "type": "string",
           "default": "",
           "description": "Author name written into native PDF comments. When empty, PDF Studio falls back to the OS username and then to 'PDF Studio'."
+        },
+        "pdfStudio.allowFingerDrawing": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow drawing and erasing PDF annotations with a finger on touch screens. When disabled, finger input scrolls the document while pen and mouse annotation remain available."
         }
       }
     },

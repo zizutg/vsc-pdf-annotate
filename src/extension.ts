@@ -39,6 +39,9 @@ export function activate(context: vscode.ExtensionContext): void {
       if (event.affectsConfiguration('pdfStudio.commentAuthor')) {
         void provider.notifyCommentAuthorChanged();
       }
+      if (event.affectsConfiguration('pdfStudio.allowFingerDrawing')) {
+        void provider.notifyInputPolicyChanged();
+      }
     }),
     vscode.window.registerCustomEditorProvider(PDF_STUDIO_VIEW_TYPE, provider, {
       webviewOptions: {

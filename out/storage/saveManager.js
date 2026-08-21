@@ -193,7 +193,9 @@ class SaveManager {
             ...annotations,
             comments: [],
         };
-        pdfDocument.catalog.set(pdf_lib_1.PDFName.of(constants_1.PDF_STUDIO_DATA_KEY), pdf_lib_1.PDFHexString.fromText(JSON.stringify(storedAnnotations)));
+        const annotationStream = pdfDocument.context.flateStream(new TextEncoder().encode(JSON.stringify(storedAnnotations)), { Type: 'EmbeddedFile' });
+        const annotationStreamRef = pdfDocument.context.register(annotationStream);
+        pdfDocument.catalog.set(pdf_lib_1.PDFName.of(constants_1.PDF_STUDIO_DATA_KEY), annotationStreamRef);
         const baseStream = pdfDocument.context.flateStream(basePdfBytes, {
             Type: 'EmbeddedFile',
         });
@@ -223,10 +225,7 @@ class SaveManager {
         this.sessionFormFields.set(cacheKey, formFields);
         this.sessionResetFormFields.set(cacheKey, extractResetFormFields(pdfDocument, formFields));
         const rawAnnotationData = pdfDocument.catalog.lookup(pdf_lib_1.PDFName.of(constants_1.PDF_STUDIO_DATA_KEY));
-        const annotationJson = rawAnnotationData instanceof pdf_lib_1.PDFHexString ||
-            rawAnnotationData instanceof pdf_lib_1.PDFString
-            ? rawAnnotationData.decodeText()
-            : null;
+        const annotationJson = decodeStoredAnnotationJson(rawAnnotationData);
         const sanitizedAnnotations = parseStoredAnnotations(annotationJson);
         const embeddedBase = pdfDocument.catalog.lookup(pdf_lib_1.PDFName.of(constants_1.PDF_STUDIO_BASE_KEY));
         const basePdfBytes = await resolveSessionBasePdfBytes(pdfBytes, pdfDocument, formFields, embeddedBase, sanitizedAnnotations);
@@ -284,6 +283,40 @@ function parseStoredAnnotations(annotationJson) {
     catch {
         return (0, annotation_1.emptyAnnotationDocument)();
     }
+}
+function decodeStoredAnnotationJson(value) {
+    try {
+        if (value instanceof pdf_lib_1.PDFRawStream) {
+            return new TextDecoder().decode((0, pdf_lib_1.decodePDFRawStream)(value).decode());
+        }
+        if (!(value instanceof pdf_lib_1.PDFHexString) && !(value instanceof pdf_lib_1.PDFString)) {
+            return null;
+        }
+        const bytes = value.asBytes();
+        if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+            return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+        }
+        if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+            return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+        }
+        return decodePdfDocEncodingInChunks(bytes);
+    }
+    catch {
+        return null;
+    }
+}
+function decodePdfDocEncodingInChunks(bytes) {
+    const chunkSize = 8_192;
+    let decoded = '';
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        const chunk = bytes.subarray(offset, offset + chunkSize);
+        let hex = '';
+        for (const byte of chunk) {
+            hex += byte.toString(16).padStart(2, '0');
+        }
+        decoded += pdf_lib_1.PDFHexString.of(hex).decodeText();
+    }
+    return decoded;
 }
 async function resolveSessionBasePdfBytes(livePdfBytes, livePdfDocument, liveFormFields, embeddedBase, annotations) {
     if (!(embeddedBase instanceof pdf_lib_1.PDFRawStream)) {

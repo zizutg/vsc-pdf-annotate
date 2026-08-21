@@ -21,11 +21,11 @@ PDF Studio is a VS Code custom editor for reviewing and annotating PDF files wit
 - Annotations are embedded back into the PDF for compatibility with other PDF readers
 - Extension-managed annotation data is also embedded in the PDF so Studio can restore editable state on reopen
 
-## Comment Author
+## Settings
 
-To set the name used for PDF Studio comments, open the Command Palette and run:
+- **Comment author:** Open the Command Palette and run `PDF Studio: Set Comment Author` to set the name written into PDF comments.
 
-`PDF Studio: Set Comment Author`
+- **Finger drawing:** Enable `PDF Studio: Allow Finger Drawing` in VS Code Settings to draw and erase with touch input. It is disabled by default so fingers scroll the document while a pen or mouse annotates.
 
 ## Current Limitations
 

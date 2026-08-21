@@ -113,6 +113,24 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
     await Promise.all(deliveries);
   }
 
+  public async notifyInputPolicyChanged(): Promise<void> {
+    const message: ExtensionToWebviewMessage = {
+      type: 'inputPolicyUpdated',
+      payload: {
+        allowFingerDrawing: this.resolveAllowFingerDrawing(),
+      },
+    };
+
+    const deliveries: Array<Thenable<boolean>> = [];
+    for (const webviews of this.webviewsByDocument.values()) {
+      for (const webview of webviews) {
+        deliveries.push(webview.postMessage(message));
+      }
+    }
+
+    await Promise.all(deliveries);
+  }
+
   private async postInitialState(
     uri: vscode.Uri,
     webview: vscode.Webview
@@ -123,6 +141,7 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
       const annotations = await this.saveManager.getAnnotations(uri);
       const formFields = await this.saveManager.getFormFields(uri);
       const commentAuthor = this.resolveCommentAuthor();
+      const allowFingerDrawing = this.resolveAllowFingerDrawing();
 
       const message: ExtensionToWebviewMessage = {
         type: 'init',
@@ -131,6 +150,7 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
           pdfBase64: Buffer.from(pdfBuffer).toString('base64'),
           outlinePdfBase64: Buffer.from(livePdfBuffer).toString('base64'),
           commentAuthor,
+          allowFingerDrawing,
           annotations,
           formFields,
           capabilities: createDefaultCapabilities(),
@@ -262,6 +282,12 @@ export class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
     }
 
     return 'PDF Studio';
+  }
+
+  private resolveAllowFingerDrawing(): boolean {
+    return vscode.workspace
+      .getConfiguration('pdfStudio')
+      .get<boolean>('allowFingerDrawing', false);
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {

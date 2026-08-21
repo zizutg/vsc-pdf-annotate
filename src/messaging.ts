@@ -10,6 +10,7 @@ export type ExtensionToWebviewMessage =
         pdfBase64: string;
         outlinePdfBase64: string;
         commentAuthor: string;
+        allowFingerDrawing: boolean;
         annotations: AnnotationDocument;
         formFields: PdfFormField[];
         capabilities: CapabilitySnapshot;
@@ -25,6 +26,12 @@ export type ExtensionToWebviewMessage =
       type: 'commentAuthorUpdated';
       payload: {
         commentAuthor: string;
+      };
+    }
+  | {
+      type: 'inputPolicyUpdated';
+      payload: {
+        allowFingerDrawing: boolean;
       };
     }
   | {

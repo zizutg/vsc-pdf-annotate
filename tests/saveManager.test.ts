@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { PDFDocument, PDFHexString, PDFName, PDFString, rgb } from 'pdf-lib';
+import {
+  decodePDFRawStream,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFRawStream,
+  PDFString,
+  rgb,
+} from 'pdf-lib';
+import { PDF_STUDIO_DATA_KEY } from '../src/constants';
 import { SaveManager } from '../storage/saveManager';
 import {
   emptyAnnotationDocument,
@@ -265,6 +274,89 @@ test('SaveManager can persist a new Studio comment as a native PDF text annotati
       }
 
       assert.equal(foundTextComment, true);
+    }
+  );
+});
+
+test('SaveManager reads large legacy annotation strings without overflowing the stack', async () => {
+  await withTempPdf(
+    async () => {
+      const pdf = await PDFDocument.create();
+      pdf.addPage([400, 500]);
+      const points = Array.from({ length: 10_000 }, (_, index) => ({
+        x: index % 400,
+        y: index % 500,
+      }));
+      const annotations: AnnotationDocument = {
+        ...emptyAnnotationDocument(),
+        strokes: [
+          {
+            id: 'large-legacy-stroke',
+            color: '#ef4444',
+            width: 3,
+            page: 1,
+            viewportWidth: 400,
+            viewportHeight: 500,
+            points,
+          },
+        ],
+      };
+      pdf.catalog.set(
+        PDFName.of(PDF_STUDIO_DATA_KEY),
+        PDFHexString.fromText(JSON.stringify(annotations))
+      );
+      return pdf.save();
+    },
+    async (_pdfPath, uri) => {
+      const manager = new SaveManager();
+      const annotations = await manager.getAnnotations(uri as any);
+
+      assert.equal(annotations.strokes.length, 1);
+      assert.equal(annotations.strokes[0]?.points.length, 10_000);
+    }
+  );
+});
+
+test('SaveManager stores annotations in a compressed stream that can be reopened', async () => {
+  await withTempPdf(
+    async () => {
+      const pdf = await PDFDocument.create();
+      pdf.addPage([400, 500]);
+      return pdf.save();
+    },
+    async (pdfPath, uri) => {
+      const manager = new SaveManager();
+      const annotations: AnnotationDocument = {
+        ...emptyAnnotationDocument(),
+        strokes: [
+          {
+            id: 'stream-stroke',
+            color: '#ef4444',
+            width: 3,
+            page: 1,
+            viewportWidth: 400,
+            viewportHeight: 500,
+            points: [
+              { x: 10, y: 20 },
+              { x: 30, y: 40 },
+            ],
+          },
+        ],
+      };
+
+      await manager.saveDocument(uri as any, annotations, []);
+
+      const saved = await PDFDocument.load(await fs.readFile(pdfPath));
+      const storedData = saved.catalog.lookup(PDFName.of(PDF_STUDIO_DATA_KEY));
+      assert.ok(storedData instanceof PDFRawStream);
+      const storedJson = new TextDecoder().decode(
+        decodePDFRawStream(storedData).decode()
+      );
+      assert.equal(JSON.parse(storedJson).strokes[0].id, 'stream-stroke');
+
+      manager.disposeSession(uri as any);
+      const reopened = await manager.getAnnotations(uri as any);
+      assert.equal(reopened.strokes[0]?.id, 'stream-stroke');
     }
   );
 });

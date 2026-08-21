@@ -115,6 +115,21 @@ class PdfEditorProvider {
         }
         await Promise.all(deliveries);
     }
+    async notifyInputPolicyChanged() {
+        const message = {
+            type: 'inputPolicyUpdated',
+            payload: {
+                allowFingerDrawing: this.resolveAllowFingerDrawing(),
+            },
+        };
+        const deliveries = [];
+        for (const webviews of this.webviewsByDocument.values()) {
+            for (const webview of webviews) {
+                deliveries.push(webview.postMessage(message));
+            }
+        }
+        await Promise.all(deliveries);
+    }
     async postInitialState(uri, webview) {
         try {
             const pdfBuffer = await this.saveManager.getPdfBytes(uri);
@@ -122,6 +137,7 @@ class PdfEditorProvider {
             const annotations = await this.saveManager.getAnnotations(uri);
             const formFields = await this.saveManager.getFormFields(uri);
             const commentAuthor = this.resolveCommentAuthor();
+            const allowFingerDrawing = this.resolveAllowFingerDrawing();
             const message = {
                 type: 'init',
                 payload: {
@@ -129,6 +145,7 @@ class PdfEditorProvider {
                     pdfBase64: Buffer.from(pdfBuffer).toString('base64'),
                     outlinePdfBase64: Buffer.from(livePdfBuffer).toString('base64'),
                     commentAuthor,
+                    allowFingerDrawing,
                     annotations,
                     formFields,
                     capabilities: (0, capabilities_1.createDefaultCapabilities)(),
@@ -231,6 +248,11 @@ class PdfEditorProvider {
             // Fall through to the extension default below.
         }
         return 'PDF Studio';
+    }
+    resolveAllowFingerDrawing() {
+        return vscode.workspace
+            .getConfiguration('pdfStudio')
+            .get('allowFingerDrawing', false);
     }
     getHtmlForWebview(webview) {
         const nonce = getNonce();

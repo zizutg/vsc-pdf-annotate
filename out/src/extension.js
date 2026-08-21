@@ -64,6 +64,9 @@ function activate(context) {
         if (event.affectsConfiguration('pdfStudio.commentAuthor')) {
             void provider.notifyCommentAuthorChanged();
         }
+        if (event.affectsConfiguration('pdfStudio.allowFingerDrawing')) {
+            void provider.notifyInputPolicyChanged();
+        }
     }), vscode.window.registerCustomEditorProvider(constants_1.PDF_STUDIO_VIEW_TYPE, provider, {
         webviewOptions: {
             retainContextWhenHidden: true,

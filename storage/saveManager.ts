@@ -255,9 +255,14 @@ export class SaveManager {
       ...annotations,
       comments: [],
     };
+    const annotationStream = pdfDocument.context.flateStream(
+      new TextEncoder().encode(JSON.stringify(storedAnnotations)),
+      { Type: 'EmbeddedFile' }
+    );
+    const annotationStreamRef = pdfDocument.context.register(annotationStream);
     pdfDocument.catalog.set(
       PDFName.of(PDF_STUDIO_DATA_KEY),
-      PDFHexString.fromText(JSON.stringify(storedAnnotations))
+      annotationStreamRef
     );
     const baseStream = pdfDocument.context.flateStream(basePdfBytes, {
       Type: 'EmbeddedFile',
@@ -301,11 +306,7 @@ export class SaveManager {
     const rawAnnotationData = pdfDocument.catalog.lookup(
       PDFName.of(PDF_STUDIO_DATA_KEY)
     );
-    const annotationJson =
-      rawAnnotationData instanceof PDFHexString ||
-      rawAnnotationData instanceof PDFString
-        ? rawAnnotationData.decodeText()
-        : null;
+    const annotationJson = decodeStoredAnnotationJson(rawAnnotationData);
     const sanitizedAnnotations = parseStoredAnnotations(annotationJson);
 
     const embeddedBase = pdfDocument.catalog.lookup(
@@ -395,6 +396,46 @@ function parseStoredAnnotations(
   } catch {
     return emptyAnnotationDocument();
   }
+}
+
+function decodeStoredAnnotationJson(value: unknown): string | null {
+  try {
+    if (value instanceof PDFRawStream) {
+      return new TextDecoder().decode(decodePDFRawStream(value).decode());
+    }
+
+    if (!(value instanceof PDFHexString) && !(value instanceof PDFString)) {
+      return null;
+    }
+
+    const bytes = value.asBytes();
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+    }
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+    }
+
+    return decodePdfDocEncodingInChunks(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function decodePdfDocEncodingInChunks(bytes: Uint8Array): string {
+  const chunkSize = 8_192;
+  let decoded = '';
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, offset + chunkSize);
+    let hex = '';
+    for (const byte of chunk) {
+      hex += byte.toString(16).padStart(2, '0');
+    }
+    decoded += PDFHexString.of(hex).decodeText();
+  }
+
+  return decoded;
 }
 
 async function resolveSessionBasePdfBytes(

@@ -43,6 +43,7 @@ const app = document.querySelector('#app');
 const state = {
   fileName: 'PDF',
   commentAuthor: 'PDF Studio',
+  allowFingerDrawing: false,
   pdfBase64: '',
   outlinePdfBase64: '',
   pageEntries: [],
@@ -611,6 +612,7 @@ async function rerenderPages() {
     getWidth: () => Number(strokeWidthEl.value),
     getHighlights: () => state.sessionAnnotations.highlights,
     getMode: () => state.mode,
+    getAllowFingerDrawing: () => state.allowFingerDrawing,
     onChange(allStrokes) {
       applySessionAnnotations({
         ...state.sessionAnnotations,
@@ -1230,6 +1232,7 @@ window.addEventListener('message', async (event) => {
   if (message.type === 'init') {
     state.fileName = message.payload.fileName;
     state.commentAuthor = message.payload.commentAuthor || 'PDF Studio';
+    state.allowFingerDrawing = Boolean(message.payload.allowFingerDrawing);
     state.pdfBase64 = message.payload.pdfBase64;
     state.outlinePdfBase64 =
       message.payload.outlinePdfBase64 || message.payload.pdfBase64;
@@ -1300,6 +1303,11 @@ window.addEventListener('message', async (event) => {
     ) {
       renderComments();
     }
+  }
+
+  if (message.type === 'inputPolicyUpdated') {
+    state.allowFingerDrawing = Boolean(message.payload.allowFingerDrawing);
+    updateInteractionMode();
   }
 
   if (message.type === 'error') {

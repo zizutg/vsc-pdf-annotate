@@ -65,10 +65,17 @@ function isStylusEraseEvent(event) {
   );
 }
 
+function isTouchInputAllowed(event, options) {
+  return (
+    event.pointerType !== 'touch' || options.getAllowFingerDrawing?.() === true
+  );
+}
+
 export function createDrawingLayer(pageEntries, options) {
   const state = {
     strokes: [],
     currentStroke: null,
+    activePointerId: null,
   };
 
   function redrawPage(pageEntry) {
@@ -105,8 +112,17 @@ export function createDrawingLayer(pageEntries, options) {
     };
   }
 
-  function finalizeStroke() {
+  function finalizeStroke(event) {
+    if (
+      event &&
+      state.activePointerId !== null &&
+      event.pointerId !== state.activePointerId
+    ) {
+      return;
+    }
+
     if (!state.currentStroke) {
+      state.activePointerId = null;
       return;
     }
 
@@ -119,6 +135,7 @@ export function createDrawingLayer(pageEntries, options) {
     }
 
     state.currentStroke = null;
+    state.activePointerId = null;
     redrawAll();
   }
 
@@ -246,10 +263,11 @@ export function createDrawingLayer(pageEntries, options) {
 
     canvas.addEventListener('pointerdown', (event) => {
       const mode = isStylusEraseEvent(event) ? 'erase' : options.getMode();
-      if (mode === 'select') {
+      if (mode === 'select' || !isTouchInputAllowed(event, options)) {
         return;
       }
 
+      event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
       if (mode === 'erase') {
         const point = {
@@ -270,12 +288,14 @@ export function createDrawingLayer(pageEntries, options) {
         viewportHeight: canvas.height,
         points: [toPoint(canvas, event)],
       };
+      state.activePointerId = event.pointerId;
       redrawPage(pageEntry);
     });
 
     canvas.addEventListener('pointermove', (event) => {
       if (
         !state.currentStroke ||
+        event.pointerId !== state.activePointerId ||
         state.currentStroke.page !== pageEntry.pageNumber ||
         options.getMode() !== 'annotate'
       ) {
@@ -294,6 +314,7 @@ export function createDrawingLayer(pageEntries, options) {
     load(strokes) {
       state.strokes = structuredClone(strokes);
       state.currentStroke = null;
+      state.activePointerId = null;
       redrawAll();
     },
     removeStroke(strokeId) {
