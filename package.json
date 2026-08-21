@@ -47,7 +47,8 @@
   ],
   "activationEvents": [
     "onCustomEditor:pdfStudio.editor",
-    "onCommand:pdfStudio.setCommentAuthor"
+    "onCommand:pdfStudio.setCommentAuthor",
+    "onCommand:pdfStudio.toggleFingerDrawing"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -70,6 +71,10 @@
       {
         "command": "pdfStudio.setCommentAuthor",
         "title": "PDF Studio: Set Comment Author"
+      },
+      {
+        "command": "pdfStudio.toggleFingerDrawing",
+        "title": "PDF Studio: Toggle Finger Drawing"
       }
     ],
     "customEditors": [

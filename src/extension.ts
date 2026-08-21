@@ -35,6 +35,26 @@ export function activate(context: vscode.ExtensionContext): void {
         : 'PDF Studio comment author cleared. OS username fallback will be used.';
       void vscode.window.showInformationMessage(message);
     }),
+    vscode.commands.registerCommand(
+      'pdfStudio.toggleFingerDrawing',
+      async () => {
+        const config = vscode.workspace.getConfiguration('pdfStudio');
+        const currentValue = config.get<boolean>('allowFingerDrawing', false);
+        const inspection = config.inspect<boolean>('allowFingerDrawing');
+        const target =
+          inspection?.workspaceFolderValue !== undefined
+            ? vscode.ConfigurationTarget.WorkspaceFolder
+            : inspection?.workspaceValue !== undefined
+              ? vscode.ConfigurationTarget.Workspace
+              : vscode.ConfigurationTarget.Global;
+        const nextValue = !currentValue;
+
+        await config.update('allowFingerDrawing', nextValue, target);
+        void vscode.window.showInformationMessage(
+          `PDF Studio finger drawing ${nextValue ? 'enabled' : 'disabled'}.`
+        );
+      }
+    ),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('pdfStudio.commentAuthor')) {
         void provider.notifyCommentAuthorChanged();
